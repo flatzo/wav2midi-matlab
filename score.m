@@ -1,33 +1,34 @@
 pkg load signal
-pkg load image
 
-window_size = 2048 .* 2
-window = hamming(window_size);
 Fc = 2500
 
 [data, sample_rate, bps] = wavread("sounds/black-dog.wav");
+% [data, sample_rate, bps] = wavread("sounds/guitar-e.wav");
 [b,a] = butter(2, Fc/(sample_rate / 2))
 
-f = sample_rate/2*linspace(0,1,window_size/2+1);
 
 % Data must be a factor of widow_size
 % data = padarray(data,mod (length(data), window_size) - 307);
 
 % Allocate vectors for containing every fft 
-FFTs =zeros(length(data) / window_size, window_size/2+1);
-
-ffts_count = 0
-for i = 1:window_size:length(data)- mod(length(data), window_size)
-	y = data(i:i+window_size-1) .* window;
-	Y = fft(y,window_size);
-    % Y = Y .* Y;
-    Y = Y/max(Y);
-	Y = abs(Y(1:window_size/2+1));
-	%Y = sgolayfilt(Y,3);
-	FFTs((i-1)/window_size + 1, :) = Y;
-    ffts_count = ffts_count + 1;
-end
-
+% FFTs =zeros(length(data) / window_size, window_size/2+1);
+% 
+% ffts_count = 0
+% for i = 1:window_size:length(data)- mod(length(data), window_size)
+% 	y = data(i:i+window_size-1);
+% 	Y = mfft(y,msize,nyq_freq,moffset);
+%     % Y = Y .* Y;
+%     Y = Y/max(Y);
+% 	Y = abs(Y(1:window_size/2+1));
+% 	%Y = sgolayfilt(Y,3);
+% 	FFTs((i-1)/window_size + 1, :) = Y;
+%     ffts_count = ffts_count + 1;
+% end
+% 
+window_size = 1024;
+FFTs = mr_fft(data,window_size);
+ffts_count = length(FFTs(:,1));
+f = sample_rate/2*linspace(0,1,window_size/2+1);
 % figure(1)
 amplitudes   = filter(b,a,conv2(sgolay(5,9,0)(3,:),[0,0,1,0,0],FFTs(:,:)));
 
@@ -42,8 +43,8 @@ amplitudes   = filter(b,a,conv2(sgolay(5,9,0)(3,:),[0,0,1,0,0],FFTs(:,:)));
 % TODO: Add another way to detect chords as this is not really reliable. It might however, increase accuracy. 
 %
 % figure(3)
-% surf(attack)
 attack      = filter(b,a,conv2(sgolay(5,9,2)(3,:),[0,0,1,0,0],FFTs(:,:)));
+% surf(attack)
 
 fr_p1 = []
 fr_p2 = []
@@ -55,9 +56,12 @@ for i = 2:ffts_count-1
     note = 1;
     for j = 1:window_size / 2 -1
         % Peak is high enough, we record it
+        % TODO: There won't be any peak for lower frequency, if there is a
+        % lower frequency that match the harmonics and that has an higher
+        % amplitude, take this one
         if ( attack(i,j) > attack(i-1,j) &&
              attack(i,j) > attack(i+1,j) &&
-             amplitudes(i+1,j) > 0.2) % This is a magic threshold, got a find a way to get 
+             amplitudes(i+1,j) > 0.3) % This is a magic threshold, got a find a way to get 
             fr = [fr j];
             if (amplitudes(i+1,j) > amplitudes(i+1,note) )
                 note = j;
@@ -67,7 +71,7 @@ for i = 2:ffts_count-1
         % Follow previous peaks until they "die" to know how long the note is
         % played
         if ( sizeof(find(fr_p1 == j)) = 1 &&
-             amplitudes(i,j) > 0.2)
+             amplitudes(i,j) > 0.02)
            % fr = [fr j]; 
         end
 
@@ -77,23 +81,23 @@ for i = 2:ffts_count-1
     end
     % note = max([max(fr) max(fr_p1)]);
     if (length(fr) > 1)
-        fprintf('# %d : %f Hz at %ds amplitude : %f\n', note, (note - 2) .* sample_rate ./ window_size, window_size ./ sample_rate .* j, amplitudes(i,note));
-        harmonics = (fr(find(fr~=note)) - 2) .* sample_rate ./ window_size;
+        fprintf('# %d : %f Hz at %ds amplitude : %f\n', note, (note) .* sample_rate ./ (window_size * 2**5), window_size ./ sample_rate .* j, amplitudes(i+1,note));
+        harmonics = (fr(find(fr~=note))) .* sample_rate ./ window_size;
     end
     fr_p2 = fr_p1;
     fr_p1 = fr;
 end
 
 
-y = data(1:window_size) .* window;
-Y = fft(y) ;
-Y = abs(Y(1:window_size/2+1));
-f = sample_rate/2*linspace(0,1,window_size/2+1);
-
-
-Y2=envelope(Y);
-Y3 = sgolayfilt(Y,3);
-
+% y = data(1:window_size) .* window;
+% Y = fft(y) ;
+% Y = abs(Y(1:window_size/2+1));
+% f = sample_rate/2*linspace(0,1,window_size/2+1);
+% 
+% 
+% Y2 =envelope(Y);
+% Y3 = sgolayfilt(Y,3);
+% 
 % figure(100)
 % plot(f, Y, f, Y2, f, Y3)
 % 
@@ -101,4 +105,3 @@ Y3 = sgolayfilt(Y,3);
 % 
 % peaks =  peakdet( Y ,60,f)
 % note(peaks)
-
