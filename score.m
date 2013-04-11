@@ -1,4 +1,5 @@
 pkg load signal
+pkg load image
 
 Fc = 2500
 
@@ -7,24 +8,6 @@ Fc = 2500
 [b,a] = butter(2, Fc/(sample_rate / 2))
 
 
-% Data must be a factor of widow_size
-% data = padarray(data,mod (length(data), window_size) - 307);
-
-% Allocate vectors for containing every fft 
-% FFTs =zeros(length(data) / window_size, window_size/2+1);
-% 
-% ffts_count = 0
-% for i = 1:window_size:length(data)- mod(length(data), window_size)
-% 	y = data(i:i+window_size-1);
-% 	Y = mfft(y,msize,nyq_freq,moffset);
-%     % Y = Y .* Y;
-%     Y = Y/max(Y);
-% 	Y = abs(Y(1:window_size/2+1));
-% 	%Y = sgolayfilt(Y,3);
-% 	FFTs((i-1)/window_size + 1, :) = Y;
-%     ffts_count = ffts_count + 1;
-% end
-% 
 window_size = 1024;
 FFTs = mr_fft(data,window_size);
 ffts_count = length(FFTs(:,1));
@@ -46,13 +29,16 @@ amplitudes   = filter(b,a,conv2(sgolay(5,9,0)(3,:),[0,0,1,0,0],FFTs(:,:)));
 attack      = filter(b,a,conv2(sgolay(5,9,2)(3,:),[0,0,1,0,0],FFTs(:,:)));
 % surf(attack)
 
-fr_p1 = []
-fr_p2 = []
+fr_p1 = [];
+fr_p2 = [];
+notes = [];
 midi  = zeros(1,6);
+time_played = zeros(1,window_size/2);
 for i = 2:ffts_count-1
     % When there is a maximum, tag it as a fft_note until it's value come down a
     % @threshold
     fr = [];
+    amp = [];
    
     fft_note = 1;
     for j = 1:window_size / 2 -1
@@ -60,48 +46,81 @@ for i = 2:ffts_count-1
         % TODO: There won't be any peak for lower frequency, if there is a
         % lower frequency that match the harmonics and that has an higher
         % amplitude, take this one
-        if ( attack(i,j) > attack(i-1,j) &&
-             attack(i,j) > attack(i+1,j) &&
-             amplitudes(i+1,j) > 0.3) % This is a magic threshold, got a find a way to get 
+        if ( attack(i,j) > attack(i-1,j)    &&
+             attack(i,j) > attack(i+1,j)    &&
+             amplitudes(i+1,j) > 0.2) 
             fr = [fr j];
-            if (amplitudes(i+1,j) > amplitudes(i+1,fft_note) )
-                fft_note = j;
+            amp = [amp amplitudes(i+1,j)];
+            % if (amplitudes(i+1,j) > amplitudes(i+1,fft_note) )
+            %     fft_note = j;
+            %     % if real note is lower frequency, take it instead
+            %     fft_note = louder_harmonic(fft_note, amplitudes(i,:));
             end
         end
-        
-        % Follow previous peaks until they "die" to know how long the fft_note is
-        % played
-        if ( sizeof(find(fr_p1 == j)) = 1 &&
-             amplitudes(i,j) > 0.02)
-           % fr = [fr j]; 
-        end
-
-        
-
-
     end
-    % fft_note = max([max(fr) max(fr_p1)]);
-    if (length(fr) > 1)
-        v = round(amplitudes(i+1,fft_note) * 120);
-        f = fft_note * sample_rate / (window_size * 2**5);
+  
+    if (length(fr) > 0)
         t = i * (window_size ) / sample_rate;
         s_8 = round((t - floor(t)) * 8) / 8;
         t = floor(t) + s_8;
-        n = note(f) + 57;
-
-        c_midi = zeros(1,6);
-        c_midi(1,1) = 1;
-        c_midi(1,2) = 1;
-        c_midi(1,3) = n;
-        c_midi(1,4) = v;
-        c_midi(1,5) = t;
-        c_midi(1,6) = t + 0.5;
-
-        midi = [midi; c_midi];
 
 
-        fprintf('# %d : %f Hz at %fs volume: %f\n', n, f, t , v);
-        harmonics = (fr(find(fr~=fft_note))) .* sample_rate ./ window_size;
+        new_notes       = get_notes(fr,amp);
+        for k = 1:length(new_notes)
+            time_played(new_notes(k)) = t;
+        end
+        stopping_notes  = setdiff(notes,new_notes) 
+        notes = unique([notes new_notes])
+        current_amp = [];
+        for k = 1:length(notes)
+            % if k ~= length(notes)
+            % l = 0;
+            % for l = k+1:length(notes)-k
+            %     if(notes(k) ~= notes(l) - 1)
+            %         break;
+            %     end
+            % end
+            % center = find(notes == max(notes(k:l)))
+            % k = l; 
+            % end
+            current_amp = [current_amp amplitudes(i+1,notes(k))];
+        end
+        stopping_notes = [stopping_notes get_stopping_notes(notes,current_amp)]
+
+        notes = setdiff(notes,stopping_notes)
+        % for k = 1:length(stopping_notes)
+        %   notes = notes(find(notes ~= stopping_notes(k)))
+        % end
+
+        % v = round(amplitudes(i+1,fft_note) * 120);
+        % f = fft_note * sample_rate / (window_size * 2**5);
+        % t = i * (window_size ) / sample_rate;
+        % s_8 = round((t - floor(t)) * 8) / 8;
+        % t = floor(t) + s_8;
+        % n = note(f) + 57;       % C4 being 60
+
+        for k = 1:length(stopping_notes)
+            fft_note = stopping_notes(k);
+            t_0 = time_played(fft_note);
+
+            v = round(amplitudes(i+1,fft_note) * 120);
+            f = fft_note * sample_rate / (window_size * 2**5);
+            n = note(f) + 57;       % C4 being 60
+
+            c_midi = zeros(1,6);
+            c_midi(1,1) = 1;
+            c_midi(1,2) = 1;
+            c_midi(1,3) = n;
+            c_midi(1,4) = v;
+            c_midi(1,5) = t_0;
+            c_midi(1,6) = t;
+
+            midi = [midi; c_midi];
+            fprintf('# %d : %f Hz at %fs volume: %f\n', n, f, t , v);
+        end
+
+
+        % harmonics = (fr(find(fr~=fft_note))) .* sample_rate ./ window_size;
     end
     fr_p2 = fr_p1;
     fr_p1 = fr;

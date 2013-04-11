@@ -29,14 +29,16 @@ function [freq_data] = mr_fft(time_data,hf_window_size,sample_rate)
             y = time_data(t:t+window_size-1) .* window;
             Y = fft(y,window_size);
             Y = abs(Y(1:window_size/2));
+            % Y = hps(Y,3);
             Y = Y ./ max(Y);
             % Y = Y ./ window_size;
 
-            length(Y);
             Y = kron(Y, ones(band_count-band+1));
-            length(Y);
 
             freq_data(i,band_start:band_end) = Y(band_start:band_end);
         end
     end
+
+    % freq_data = hps(freq_data,3);
+    % freq_data = freq_data ./ max(freq_data);
 end
