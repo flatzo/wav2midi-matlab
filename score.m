@@ -82,7 +82,7 @@ for i = 2:ffts_count-1
     end
     % fft_note = max([max(fr) max(fr_p1)]);
     if (length(fr) > 1)
-        v = round(amplitudes(i+1,fft_note) * 127);
+        v = round(amplitudes(i+1,fft_note) * 120);
         f = fft_note * sample_rate / (window_size * 2**5);
         t = i * (window_size ) / sample_rate;
         s_8 = round((t - floor(t)) * 8) / 8;
