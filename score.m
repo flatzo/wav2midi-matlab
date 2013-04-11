@@ -55,7 +55,7 @@ for i = 2:ffts_count-1
             %     fft_note = j;
             %     % if real note is lower frequency, take it instead
             %     fft_note = louder_harmonic(fft_note, amplitudes(i,:));
-            end
+            % end
         end
     end
   
@@ -66,8 +66,16 @@ for i = 2:ffts_count-1
 
 
         new_notes       = get_notes(fr,amp);
+        prev_n       = 0
         for k = 1:length(new_notes)
-            time_played(new_notes(k)) = t;
+            n = new_notes(k) * sample_rate / (window_size * 2**5);
+            if( n == prev_n )
+                continue
+            end
+            if(time_played(new_notes(k)) == 0)
+                time_played(new_notes(k)) = t;
+            end
+            prev_n = n;
         end
         stopping_notes  = setdiff(notes,new_notes) 
         notes = unique([notes new_notes])
@@ -99,13 +107,21 @@ for i = 2:ffts_count-1
         % t = floor(t) + s_8;
         % n = note(f) + 57;       % C4 being 60
 
+        prev_n = 0;
         for k = 1:length(stopping_notes)
+
             fft_note = stopping_notes(k);
             t_0 = time_played(fft_note);
+            time_played(fft_note) = 0;
 
             v = round(amplitudes(i+1,fft_note) * 120);
             f = fft_note * sample_rate / (window_size * 2**5);
             n = note(f) + 57;       % C4 being 60
+
+            if(n == prev_n)
+                continue
+            end
+            prev_n = n;
 
             c_midi = zeros(1,6);
             c_midi(1,1) = 1;

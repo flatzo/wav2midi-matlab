@@ -17,6 +17,9 @@ function [freq_data] = mr_fft(time_data,hf_window_size,sample_rate)
 
         band_end    = freq_count / 2**(band)
         band_start  = band_end / 2
+        
+        % Do a FFT for every multiple of high frequency window 
+        % FFT is however done on band's own window_size
 
         % Do a FFT for every multiple of high frequency window 
         % FFT is however done on band's own window_size
@@ -34,6 +37,12 @@ function [freq_data] = mr_fft(time_data,hf_window_size,sample_rate)
             % Y = Y ./ window_size;
 
             Y = kron(Y, ones(band_count-band+1));
+
+            % for j = band_start:band_end
+            %     f = j * sample_rate / lf_window_size;
+            %     i_note = round(note(f)) + 57;
+            %     note_data(i,i_note) = (Y(j) * sample_rate / lf_window_size + note(i,i_note)) / 2;
+            % end
 
             freq_data(i,band_start:band_end) = Y(band_start:band_end);
         end
