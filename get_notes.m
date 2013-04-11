@@ -12,10 +12,10 @@ function [notes volume] = get_notes(frequencies,amplitudes)
         for j = i+1:length(frequencies)
             % Verifier que cest proche dun nombre entier
             fl = frequencies(j)/frequencies(i);
-            int_diff = (fl - round(fl));
+            int_diff = abs(fl - round(fl));
             if (int_diff < 0.05)
                 % Verifier lequel est l'harmonique de l'autre
-                if (amplitudes(i) > 1.1 * amplitudes(j))
+                if (amplitudes(i) > 0.9 * amplitudes(j))
                     index = [index i];
                 else
                     index = [index j];

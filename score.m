@@ -3,12 +3,13 @@ pkg load image
 
 Fc = 2500
 
-[data, sample_rate, bps] = wavread("sounds/black-dog.wav");
+% [data, sample_rate, bps] = wavread("sounds/black-dog.wav");
+ [data, sample_rate, bps] = wavread("sounds/dust-in-the-wind.wav");
 % [data, sample_rate, bps] = wavread("sounds/guitar-e.wav");
 [b,a] = butter(2, Fc/(sample_rate / 2))
 
 
-window_size = 1024;
+window_size = 1024 * 2;
 FFTs = mr_fft(data,window_size);
 ffts_count = length(FFTs(:,1));
 f = sample_rate/2*linspace(0,1,window_size/2+1);
@@ -66,19 +67,21 @@ for i = 2:ffts_count-1
 
 
         new_notes       = get_notes(fr,amp);
-        prev_n       = 0
+        prev_n       = 0;
         for k = 1:length(new_notes)
-            n = new_notes(k) * sample_rate / (window_size * 2**5);
-            if( n == prev_n )
-                continue
-            end
-            if(time_played(new_notes(k)) == 0)
-                time_played(new_notes(k)) = t;
+            f = new_notes(k) * sample_rate / (window_size * 2**5);
+            n = round(note(f)) + 57;       % C4 being 60
+
+            % if( n == prev_n )
+            %     continue
+            % end
+            if(time_played(n) == 0)
+                time_played(n) = t;
             end
             prev_n = n;
         end
-        stopping_notes  = setdiff(notes,new_notes) 
-        notes = unique([notes new_notes])
+        stopping_notes  = setdiff(notes,new_notes);
+        notes = unique([notes new_notes]);
         current_amp = [];
         for k = 1:length(notes)
             % if k ~= length(notes)
@@ -93,9 +96,9 @@ for i = 2:ffts_count-1
             % end
             current_amp = [current_amp amplitudes(i+1,notes(k))];
         end
-        stopping_notes = [stopping_notes get_stopping_notes(notes,current_amp)]
+        stopping_notes = [stopping_notes get_stopping_notes(notes,current_amp)];
 
-        notes = setdiff(notes,stopping_notes)
+        notes = setdiff(notes,stopping_notes);
         % for k = 1:length(stopping_notes)
         %   notes = notes(find(notes ~= stopping_notes(k)))
         % end
@@ -111,16 +114,19 @@ for i = 2:ffts_count-1
         for k = 1:length(stopping_notes)
 
             fft_note = stopping_notes(k);
-            t_0 = time_played(fft_note);
-            time_played(fft_note) = 0;
 
-            v = round(amplitudes(i+1,fft_note) * 120);
+            v = round(amplitudes(i+1,fft_note) * 30) + 80; % * 120);
             f = fft_note * sample_rate / (window_size * 2**5);
-            n = note(f) + 57;       % C4 being 60
-
-            if(n == prev_n)
-                continue
+            n = round(note(f)) + 57;       % C4 being 60
+            t_0 = time_played(n);
+            if(t_0 == 0)
+                continue;
             end
+            time_played(n) = 0;
+
+             if(n == prev_n)
+                 continue
+             end
             prev_n = n;
 
             c_midi = zeros(1,6);
@@ -128,8 +134,8 @@ for i = 2:ffts_count-1
             c_midi(1,2) = 1;
             c_midi(1,3) = n;
             c_midi(1,4) = v;
-            c_midi(1,5) = t_0;
-            c_midi(1,6) = t;
+            c_midi(1,5) = t_0 * 1.1;
+            c_midi(1,6) = t   * 1.1;
 
             midi = [midi; c_midi];
             fprintf('# %d : %f Hz at %fs volume: %f\n', n, f, t , v);
@@ -138,8 +144,6 @@ for i = 2:ffts_count-1
 
         % harmonics = (fr(find(fr~=fft_note))) .* sample_rate ./ window_size;
     end
-    fr_p2 = fr_p1;
-    fr_p1 = fr;
 end
 
 midi_new = matrix2midi(midi);

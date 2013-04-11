@@ -1,3 +1,12 @@
+Aspect général
+==============
+
+* But 	     : Créer une partition / fichier midi à partir d'une chanson
+* Langage    : MatLab
+* Temps réel : Non
+* Traitement : Spectral
+
+
 Etapes de traitement
 ====================
 
@@ -27,15 +36,16 @@ Suivre la note
 
 Enregistrer la note comme terminée seulement lorsque son amplitude descends en dessous d'un certain seuil.
 
+### Amélioration 
+
+Sortir les notes directement du spectrogramme. Plus simple gérer une seule échelle. 
+
+
 Ecriture de fichier midi
 ------------------------
 
 Utilisation de code existant.
 Source : https://github.com/kts/matlab-midi
-
-### Amélioration 
-
-Sortir les notes directement du spectrogramme. Plus simple gérer une seule échelle. 
 
 Avenues abandonnées
 ===================
