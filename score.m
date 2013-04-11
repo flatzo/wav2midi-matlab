@@ -36,8 +36,8 @@ amplitudes   = filter(b,a,conv2(sgolay(5,9,0)(3,:),[0,0,1,0,0],FFTs(:,:)));
 % surf(conv2(sgolay(5,9,1)(3,:),[0,0,1,0,0],FFTs(:,1:60)))
 
 % Second derivative gives the attack. The maxima seems to be timed between harmonics, which is not the case in when comparing the maxima of amplitudes for each frequencies.
-% This is important, as for chord detection, I assume that each note won't be played at the exact same time. Which is an approximation that could work most of the times. It is this way, easier to see which harmonic belongs to which fundamental frequency.
-% The first minimum gives approximatly the moment when note is stroke as it 
+% This is important, as for chord detection, I assume that each fft_note won't be played at the exact same time. Which is an approximation that could work most of the times. It is this way, easier to see which harmonic belongs to which fundamental frequency.
+% The first minimum gives approximatly the moment when fft_note is stroke as it 
 % A better way to find it might be to look for a new maximum, followed by a greater minimu (might be almost equal). The not has been played in between those 2 peaks as maximum represents the 
 % This might not work with some instruments (mostly electronic ones, violin ... ) which gain volume with time, as a fade in sound. In this technique, we'll just assume we don't have to deal with those. 
 % TODO: Add another way to detect chords as this is not really reliable. It might however, increase accuracy. 
@@ -48,12 +48,13 @@ attack      = filter(b,a,conv2(sgolay(5,9,2)(3,:),[0,0,1,0,0],FFTs(:,:)));
 
 fr_p1 = []
 fr_p2 = []
+midi  = zeros(1,6);
 for i = 2:ffts_count-1
-    % When there is a maximum, tag it as a note until it's value come down a
+    % When there is a maximum, tag it as a fft_note until it's value come down a
     % @threshold
     fr = [];
    
-    note = 1;
+    fft_note = 1;
     for j = 1:window_size / 2 -1
         % Peak is high enough, we record it
         % TODO: There won't be any peak for lower frequency, if there is a
@@ -63,12 +64,12 @@ for i = 2:ffts_count-1
              attack(i,j) > attack(i+1,j) &&
              amplitudes(i+1,j) > 0.3) % This is a magic threshold, got a find a way to get 
             fr = [fr j];
-            if (amplitudes(i+1,j) > amplitudes(i+1,note) )
-                note = j;
+            if (amplitudes(i+1,j) > amplitudes(i+1,fft_note) )
+                fft_note = j;
             end
         end
         
-        % Follow previous peaks until they "die" to know how long the note is
+        % Follow previous peaks until they "die" to know how long the fft_note is
         % played
         if ( sizeof(find(fr_p1 == j)) = 1 &&
              amplitudes(i,j) > 0.02)
@@ -79,15 +80,35 @@ for i = 2:ffts_count-1
 
 
     end
-    % note = max([max(fr) max(fr_p1)]);
+    % fft_note = max([max(fr) max(fr_p1)]);
     if (length(fr) > 1)
-        fprintf('# %d : %f Hz at %ds amplitude : %f\n', note, (note) .* sample_rate ./ (window_size * 2**5), window_size ./ sample_rate .* j, amplitudes(i+1,note));
-        harmonics = (fr(find(fr~=note))) .* sample_rate ./ window_size;
+        v = round(amplitudes(i+1,fft_note) * 127);
+        f = fft_note * sample_rate / (window_size * 2**5);
+        t = i * (window_size ) / sample_rate;
+        s_8 = round((t - floor(t)) * 8) / 8;
+        t = floor(t) + s_8;
+        n = note(f) + 57;
+
+        c_midi = zeros(1,6);
+        c_midi(1,1) = 1;
+        c_midi(1,2) = 1;
+        c_midi(1,3) = n;
+        c_midi(1,4) = v;
+        c_midi(1,5) = t;
+        c_midi(1,6) = t + 0.5;
+
+        midi = [midi; c_midi];
+
+
+        fprintf('# %d : %f Hz at %fs volume: %f\n', n, f, t , v);
+        harmonics = (fr(find(fr~=fft_note))) .* sample_rate ./ window_size;
     end
     fr_p2 = fr_p1;
     fr_p1 = fr;
 end
 
+midi_new = matrix2midi(midi);
+writemidi(midi_new, 'testout.mid');
 
 % y = data(1:window_size) .* window;
 % Y = fft(y) ;
@@ -104,4 +125,4 @@ end
 % 
 % 
 % peaks =  peakdet( Y ,60,f)
-% note(peaks)
+% fft_note(peaks)
